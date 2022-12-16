@@ -1,5 +1,4 @@
 
-
 let paginator = async (req, res, next) => {
 
     let page = isNaN(parseInt(req.query.page)) ? 1 : parseInt(req.query.page);

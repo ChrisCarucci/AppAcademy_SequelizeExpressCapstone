@@ -68,6 +68,33 @@ router.get('/scissors/calculate', async (req, res, next) => {
         // result.numLeftHandedStudents should equal the total number of
             // left-handed students in all classrooms
     // Your code here
+    let counts = await Supply.findAll({
+        attributes: [
+            "handed",
+            [sequelize.fn("COUNT", sequelize.col('handed')), 'num'],
+        ],
+        group: 'handed',
+        order: [['handed', 'DESC']]
+    });
+
+    result.numRightyScissors = counts[0].dataValues.num;
+    result.numLeftyScissors = counts[1].dataValues.num;
+    result.totalNumScissors = result.numLeftyScissors + result.numRightyScissors;
+
+
+    let students = await StudentClassroom.findAll({
+        attributes: [
+            [sequelize.fn('COUNT', sequelize.col('StudentClassroom.id')), 'count']
+        ],
+        include: {
+            model: Student,
+            attributes: ['leftHanded']
+        },
+        group: 'leftHanded'
+
+    });
+    result.numRightHandedStudents = students[0].dataValues.count;
+    result.numLeftHandedStudents = students[1].dataValues.count;
 
     // Phase 10C: Total number of scissors still needed for all classrooms
         // result.numRightyScissorsStillNeeded should equal the total number
@@ -80,6 +107,11 @@ router.get('/scissors/calculate', async (req, res, next) => {
             // of left-handed scissors still needed to be added to all the
             // classrooms
     // Your code here
+    
+
+
+    result.numRightyScissorsStillNeeded = result.numRightHandedStudents - result.numRightyScissors;
+    result.numLeftyScissorsStillNeeded = result.numLeftHandedStudents - result.numLeftyScissors;
 
     res.json(result);
 });

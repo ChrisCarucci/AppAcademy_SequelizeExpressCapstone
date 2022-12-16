@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 
 // Import model(s)
-const { Classroom } = require('../db/models');
+const { Classroom, Supply, StudentClassroom, Student, sequelize } = require('../db/models');
 const { Op } = require('sequelize');
 
 // List of classrooms
@@ -38,6 +38,38 @@ router.get('/', async (req, res, next) => {
 
     // Your code here
 
+    if (req.query.name) {
+        where.name = {
+            [Op.like]: `%${req.query.name}`
+        }
+    }
+
+    if (req.query.studentLimit) {
+        let limits = req.query.studentLimit.split(',');
+        let minStudents = parseInt(limits[0]);
+        let maxStudents = parseInt(limits[1]);
+
+
+        if(isNaN(minStudents) || isNaN(maxStudents) || minStudents > maxStudents) {
+            errorResult.push({
+                message: "Min/Max students must be a number with Min < Max."
+            })
+        } else {
+            where.studentLimit = {};
+            where.studentLimit[Op.between] = limits
+        }
+
+        if (errorResult.errors.length >= 1) {
+            res.json({
+                status: 400,
+                body: errorResult
+            });
+        }
+
+
+        
+    }
+
     const classrooms = await Classroom.findAll({
         attributes: [ 'id', 'name', 'studentLimit' ],
         where,
@@ -59,6 +91,21 @@ router.get('/:id', async (req, res, next) => {
                 // then firstName (both in ascending order)
                 // (Optional): No need to include the StudentClassrooms
         // Your code here
+        include: [
+            {
+                model: Supply,
+                attributes: ['id', 'name', 'category', 'handed']
+            },
+            {
+                model: Student,
+                attributes: ['id', 'firstName', 'lastName']
+            }
+        ],
+        order: [
+            [Supply, 'category', 'ASC'], [Supply, 'name', 'ASC'],
+            [Student, 'lastName', 'ASC'], [Student, 'firstName', 'ASC']
+        ]
+
     });
 
     if (!classroom) {
@@ -76,6 +123,28 @@ router.get('/:id', async (req, res, next) => {
             // classroom
         // Optional Phase 5D: Calculate the average grade of the classroom 
     // Your code here
+    classroom = classroom.toJSON();
+
+    classroom.supplyCount = await Supply.count({
+        where: {
+            classroomId: req.params.id
+        }
+    });
+
+    classroom.studentCount = await StudentClassroom.count({
+        where: {
+            classroomId: req.params.id
+        }
+    })
+
+    classroom.overloaded =
+        classroom.studentCount > classroom.studentLimit ? true : false
+
+    classroom.avgGrade = await StudentClassroom.sum('grade', {
+        where: {
+            classroomId: req.params.id
+        }
+    }) 
 
     res.json(classroom);
 });
